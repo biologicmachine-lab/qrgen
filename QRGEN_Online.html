@@ -1,0 +1,626 @@
+<!Doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Generator Pro — Offline Single File</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/Z1srPv7lOy9C27hHQ+Xp8a4MxAQ5a+W5U8lXKfekQm0Zvs+nLTIsGPKoeG1cV8qW6g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  
+  <style>
+    /* Minimal styling (same as previous UI, condensed) */
+    :root{ --bg:#eef2ff; --card:#fff; --text:#0f1724; --muted:#6b7280; --accent:#6366f1; --danger:#ef4444;}
+    [data-theme="dark"]{ --bg:#071022; --card:#07112a; --text:#e6eef8; --muted:#9aa7c2; --accent:#7c3aed; --danger:#f87171; }
+    *{box-sizing:border-box} body{font-family:Inter, system-ui, -apple-system, Roboto, Arial; margin:0; background:var(--bg); color:var(--text); padding:16px;}
+    .wrap{max-width:1300px;margin:0 auto;display:grid;grid-template-columns:420px 1fr;gap:16px}
+    .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(2,6,23,0.06)}
+    .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+    .tab{padding:8px 10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);cursor:pointer}
+    .tab.active{background:var(--accent);color:#fff;border-color:transparent}
+    label{display:block;font-weight:600;margin-top:10px}
+    input, select, textarea{width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;background:transparent;color:var(--text)}
+    textarea{min-height:84px}
+    .row{display:flex;gap:8px;align-items:center}
+    .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    button{cursor:pointer;padding:8px 10px;border-radius:8px;border:2px solid var(--accent);background:transparent;color:var(--accent);font-weight:700}
+    button.primary{background:var(--accent);color:#fff;border-color:transparent}
+    button.ghost{border:1px solid #cbd5e1;color:var(--text);background:transparent}
+    .small{font-size:.85rem;color:var(--muted)}
+    .qr-canvas{background:var(--card);padding:12px;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:320px;width:320px}
+    .placeholder{text-align:center;color:var(--muted)}
+    .download-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+    .section-title{font-weight:700;margin:0 0 8px}
+    @media (max-width:1100px){.wrap{grid-template-columns:1fr} .qr-canvas{width:280px}}
+    .spinner{display:inline-block;width:18px;height:18px;border:3px solid rgba(0,0,0,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .shape-btn{padding:6px;border-radius:8px;border:1px solid #eee;background:transparent;cursor:pointer}
+    .shape-btn.active{background:var(--accent);color:#fff;border-color:transparent}
+  </style>
+</head>
+<body data-theme="light">
+
+<div class="wrap">
+
+  <!-- LEFT: Editor -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h2 style="margin:0">QR Generator Pro — Offline</h2>
+        <div class="small">Tabbed editor · styled text pages · live preview</div>
+      </div>
+      <div>
+        <label class="small" style="margin:0 0 4px 0">Theme</label>
+        <select id="themeToggle"><option value="light">Light</option><option value="dark">Dark</option></select>
+      </div>
+    </div>
+
+    <div class="tabs" id="typeTabs" style="margin-top:12px">
+      <div class="tab active" data-type="text">Text</div>
+      <div class="tab" data-type="url">URL</div>
+      <div class="tab" data-type="email">Email</div>
+      <div class="tab" data-type="phone">Call</div>
+      <div class="tab" data-type="sms">SMS</div>
+      <div class="tab" data-type="wifi">WiFi</div>
+      <div class="tab" data-type="vcard">vCard</div>
+      <div class="tab" data-type="event">Event</div>
+    </div>
+
+    <div id="formArea">
+      <!-- Text form (default) -->
+      <div class="form-block" data-form="text">
+        <label>Text</label>
+        <textarea id="textContent" placeholder="Enter text..."></textarea>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div>
+            <label>Font</label>
+            <select id="textFont"><option>Inter</option><option>Roboto</option><option>Arial</option><option>Georgia</option></select>
+          </div>
+          <div>
+            <label>Font size</label>
+            <input type="range" id="textFontSize" min="12" max="72" value="28">
+            <div class="small" id="textFontSizeLabel">28 px</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div><label>Text color</label><input type="color" id="textColor" value="#111111"></div>
+          <div><label>Background color</label><input type="color" id="textBgColor" value="#ffffff"></div>
+        </div>
+
+        <label style="margin-top:8px">Text background shape</label>
+        <div id="textShapePicker" style="display:flex;gap:6px;margin-top:6px">
+          <button class="shape-btn active" data-shape="none">None</button>
+          <button class="shape-btn" data-shape="rectangle">Rectangle</button>
+          <button class="shape-btn" data-shape="rounded">Rounded</button>
+          <button class="shape-btn" data-shape="circle">Circle</button>
+        </div>
+
+        <label style="margin-top:8px">Emoji quick add</label>
+        <div style="display:flex;gap:6px;margin-top:6px" id="emojiGrid">
+          <button>😊</button><button>🔥</button><button>⭐</button><button>🎉</button><button>📱</button>
+        </div>
+
+        <div style="margin-top:10px">
+          <label><input type="checkbox" id="textAsPage"> Make text open as styled page (data-URL)</label>
+          <div class="small">Creates a small HTML page encoded in the QR. If too large you will be warned and fallback to plain text.</div>
+        </div>
+      </div>
+
+      <!-- URL -->
+      <div class="form-block" data-form="url" style="display:none">
+        <label>Website URL</label>
+        <input id="urlContent" type="text" placeholder="https://example.com">
+        <label style="margin-top:8px">Logo upload (for URL overlay)</label>
+        <input id="urlLogoUpload" type="file" accept="image/*">
+        <label style="margin-top:8px">Logo position</label>
+        <select id="urlLogoPosition"><option value="center">Center</option><option value="top">Top</option><option value="bottom">Bottom</option></select>
+      </div>
+
+      <!-- Email -->
+      <div class="form-block" data-form="email" style="display:none">
+        <label>To</label><input id="emailTo" type="email" placeholder="name@example.com">
+        <label>Subject</label><input id="emailSubject" type="text">
+        <label>Body</label><textarea id="emailBody"></textarea>
+      </div>
+
+      <!-- Phone -->
+      <div class="form-block" data-form="phone" style="display:none">
+        <label>Phone number</label><input id="phoneNumber" type="tel">
+      </div>
+
+      <!-- SMS -->
+      <div class="form-block" data-form="sms" style="display:none">
+        <label>Phone number</label><input id="smsNumber" type="tel">
+        <label>Message</label><textarea id="smsMessage"></textarea>
+      </div>
+
+      <!-- WiFi -->
+      <div class="form-block" data-form="wifi" style="display:none">
+        <label>SSID</label><input id="wifiSSID"><label>Password</label><input id="wifiPass">
+        <label>Security</label><select id="wifiSec"><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="nopass">Open</option></select>
+      </div>
+
+      <!-- vCard -->
+      <div class="form-block" data-form="vcard" style="display:none">
+        <label>Full name</label><input id="vc_name"><label>Company</label><input id="vc_org">
+        <label>Phone</label><input id="vc_tel"><label>Email</label><input id="vc_email"><label>Website</label><input id="vc_url">
+      </div>
+
+      <!-- Event -->
+      <div class="form-block" data-form="event" style="display:none">
+        <label>Title</label><input id="ev_title"><label>Start (YYYY-MM-DD HH:MM)</label><input id="ev_start">
+        <label>End (optional)</label><input id="ev_end"><label>Location</label><input id="ev_loc"><label>Description</label><textarea id="ev_desc"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <label>Foreground (QR)</label>
+        <input id="fgColor" type="color" value="#000000">
+      </div>
+      <div>
+        <label>Background (QR)</label>
+        <input id="bgColor" type="color" value="#ffffff">
+      </div>
+      <div>
+        <label>QR size</label>
+        <input id="qrSize" type="range" min="180" max="900" value="360"><div class="small" id="qrSizeLabel">360 px</div>
+      </div>
+      <div>
+        <label>Error correction</label>
+        <select id="errLevel"><option value="L">L</option><option value="M" selected>M</option><option value="Q">Q</option><option value="H">H</option></select>
+      </div>
+      <div style="grid-column:1/-1;margin-top:8px">
+        <label>QR module shape</label>
+        <div style="display:flex;gap:6px;margin-top:6px" id="moduleShapePicker">
+          <button class="shape-btn active" data-shape="square">Square</button>
+          <button class="shape-btn" data-shape="dot">Dot</button>
+          <button class="shape-btn" data-shape="round">Round</button>
+        </div>
+      </div>
+
+      <div style="grid-column:1/-1;margin-top:8px">
+        <label><input id="livePreview" type="checkbox" checked> Live preview (debounced)</label>
+      </div>
+    </div>
+
+    <div class="controls" style="margin-top:10px">
+      <button id="generateBtn" class="primary"><i class="fas fa-magic"></i> Generate</button>
+      <button id="resetBtn" class="ghost danger"><i class="fas fa-rotate-left"></i> Reset</button>
+      <button id="saveTemplate" class="ghost"><i class="fas fa-save"></i> Save Template</button>
+    </div>
+
+    <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
+
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong class="section-title">Templates</strong><div class="small">Saved in localStorage</div></div>
+      <div><button id="clearTemplates" class="ghost small">Clear</button></div>
+    </div>
+    <div id="templateList" style="max-height:160px;overflow:auto;margin-top:8px"></div>
+
+    <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
+
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><strong class="section-title">Bulk Import (Excel)</strong><div class="small">Column A: text</div></div>
+      <div id="bulkSpinner" style="display:none" class="spinner"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input id="bulkFile" type="file" accept=".xlsx,.xls">
+      <button id="bulkGenerate" class="ghost">Generate ZIP</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: preview + downloads + history -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h2 style="margin:0">Preview & Downloads</h2>
+        <div class="small">PNG / SVG / PDF, history, export</div>
+      </div>
+      <div class="small">Theme: <span id="currentTheme">Light</span></div>
+    </div>
+
+    <div style="display:flex;gap:16px;margin-top:12px;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <div class="qr-canvas" id="previewArea">
+          <div class="placeholder" id="placeholderInner"><i class="fas fa-qrcode" style="font-size:48px"></i><div>Generate a QR to preview here</div></div>
+        </div>
+
+        <div class="download-row">
+          <button id="downloadPNG" disabled><i class="fas fa-image"></i> PNG</button>
+          <button id="downloadSVG" disabled><i class="fas fa-vector-square"></i> SVG</button>
+          <button id="downloadPDF" disabled><i class="fas fa-file-pdf"></i> PDF</button>
+          <button id="saveHistory" disabled><i class="fas fa-clock"></i> Save</button>
+        </div>
+      </div>
+
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong class="section-title">History</strong><div class="small">Saved previews (localStorage)</div></div>
+          <div><button id="exportHistory" class="ghost small">Export ZIP</button> <button id="clearHistory" class="ghost small danger">Clear</button></div>
+        </div>
+
+        <div id="historyList" style="margin-top:8px;max-height:360px;overflow:auto"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<body>
+  <div style="text-align:center;margin-top:16px" class="small">&copy; 2024 QR Generator Pro — Online Single File</div>
+    <script src="libs/qrcode.min.js"></script>
+    <script src="libs/qrcode-generator.min.js"></script>
+    <script src="libs/jspdf.umd.min.js"></script>
+    <script src="libs/xlsx.full.min.js"></script>
+    <script src="libs/jszip.min.js"></script>
+</body>
+
+<script>
+/* Element refs */
+
+const $ = id => document.getElementById(id);
+
+const tabs = document.querySelectorAll('.tab');
+const formBlocks = document.querySelectorAll('.form-block');
+const themeToggle = $('themeToggle');
+const currentTheme = $('currentTheme');
+
+const textContent = $('textContent');
+const textFont = $('textFont');
+const textFontSize = $('textFontSize');
+const textFontSizeLabel = $('textFontSizeLabel');
+const textColor = $('textColor');
+const textBgColor = $('textBgColor');
+const textAsPage = $('textAsPage');
+
+const urlContent = $('urlContent');
+const urlLogoUpload = $('urlLogoUpload');
+const urlLogoPosition = $('urlLogoPosition');
+
+const emailTo = $('emailTo');
+const emailSubject = $('emailSubject');
+const emailBody = $('emailBody');
+
+const phoneNumber = $('phoneNumber');
+
+const smsNumber = $('smsNumber');
+const smsMessage = $('smsMessage');
+
+const wifiSSID = $('wifiSSID');
+const wifiPass = $('wifiPass');
+const wifiSec = $('wifiSec');
+
+const vcName = $('vc_name'), vcOrg = $('vc_org'), vcTel = $('vc_tel'), vcEmail = $('vc_email'), vcUrl = $('vc_url');
+
+const evTitle = $('ev_title'), evStart = $('ev_start'), evEnd = $('ev_end'), evLoc = $('ev_loc'), evDesc = $('ev_desc');
+
+const fgColor = $('fgColor'), bgColor = $('bgColor'), qrSize = $('qrSize'), qrSizeLabel = $('qrSizeLabel'), errLevel = $('errLevel');
+const moduleShapePicker = $('moduleShapePicker');
+const livePreview = $('livePreview');
+
+const generateBtn = $('generateBtn'), resetBtn = $('resetBtn'), saveTemplate = $('saveTemplate');
+
+const previewArea = $('previewArea'), placeholderInner = $('placeholderInner');
+
+const downloadPNG = $('downloadPNG'), downloadSVG = $('downloadSVG'), downloadPDF = $('downloadPDF'), saveHistoryBtn = $('saveHistory');
+
+const templateList = $('templateList'), clearTemplates = $('clearTemplates');
+
+const bulkFile = $('bulkFile'), bulkGenerate = $('bulkGenerate'), bulkSpinner = $('bulkSpinner');
+
+const historyList = $('historyList'), exportHistory = $('exportHistory'), clearHistory = $('clearHistory');
+
+let currentURLLogoImage = null;
+let currentPreviewCanvas = null;
+let lastGeneratedText = '';
+
+const TEMPLATES_KEY = 'qr_offline_templates_v1';
+const HISTORY_KEY = 'qr_offline_history_v1';
+
+/* helpers */
+function setTheme(t){ document.body.setAttribute('data-theme', t); currentTheme.textContent = t.charAt(0).toUpperCase()+t.slice(1); }
+themeToggle.addEventListener('change', e=> setTheme(e.target.value));
+setTheme('light');
+
+qrSize.addEventListener('input', ()=> qrSizeLabel.textContent = qrSize.value + ' px');
+textFontSize.addEventListener('input', ()=> { const el = document.getElementById('textFontSizeLabel'); if(el) el.textContent = textFontSize.value + ' px'; });
+
+/* Tabs */
+tabs.forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    tabs.forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const type = tab.dataset.type;
+    formBlocks.forEach(fb => fb.dataset.form === type ? fb.style.display='': fb.style.display='none');
+    if(livePreview.checked) debouncedGenerate();
+  });
+});
+
+/* shapes toggles */
+document.querySelectorAll('#textShapePicker .shape-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#textShapePicker .shape-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(livePreview.checked) debouncedGenerate();
+  });
+});
+document.querySelectorAll('#moduleShapePicker .shape-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#moduleShapePicker .shape-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if(livePreview.checked) debouncedGenerate();
+  });
+});
+
+/* emojis quick add */
+document.querySelectorAll('#emojiGrid button').forEach(b=>{
+  b.addEventListener('click', ()=> {
+    const emoji = b.textContent;
+    const pos = textContent.selectionStart || textContent.value.length;
+    const before = textContent.value.slice(0,pos), after = textContent.value.slice(pos);
+    textContent.value = before + emoji + after;
+    if(livePreview.checked) debouncedGenerate();
+  });
+});
+
+/* logo upload for URL overlay */
+urlLogoUpload.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f){ currentURLLogoImage = null; return; }
+  const img = new Image();
+  img.onload = ()=> { currentURLLogoImage = img; if(livePreview.checked) debouncedGenerate(); };
+  img.onerror = ()=> { alert('Failed to load URL logo'); currentURLLogoImage = null; };
+  img.src = URL.createObjectURL(f);
+});
+
+/* live preview handlers */
+let liveTimer = null;
+function debouncedGenerate(){ if(liveTimer) clearTimeout(liveTimer); liveTimer = setTimeout(()=>{ liveTimer = null; generateHandler({silent:true}); }, 450); }
+[ textContent, textFont, textFontSize, textColor, textBgColor, textAsPage, urlContent, emailTo, emailSubject, emailBody, phoneNumber, smsNumber, smsMessage, wifiSSID, wifiPass, wifiSec, vcName, vcOrg, vcTel, vcEmail, vcUrl, evTitle, evStart, evEnd, evLoc, evDesc, fgColor, bgColor, qrSize, errLevel].forEach(el=>{ if(!el) return; el.addEventListener('input', ()=> { if(livePreview.checked) debouncedGenerate(); }); el.addEventListener('change', ()=> { if(livePreview.checked) debouncedGenerate(); }); });
+
+/* clear preview */
+function clearPreview(){ previewArea.innerHTML=''; previewArea.appendChild(placeholderInner); downloadPNG.disabled=true; downloadSVG.disabled=true; downloadPDF.disabled=true; saveHistoryBtn.disabled=true; currentPreviewCanvas=null; lastGeneratedText=''; }
+clearPreview();
+
+/* Templates */
+function loadTemplates(){
+  templateList.innerHTML = '';
+  const raw = localStorage.getItem(TEMPLATES_KEY);
+  if(!raw) return;
+  const arr = JSON.parse(raw);
+  arr.forEach((t,i)=>{
+    const el = document.createElement('div'); el.className='template-item'; el.style.display='flex'; el.style.alignItems='center'; el.style.justifyContent='space-between'; el.style.padding='6px'; el.style.border='1px solid #eee'; el.style.borderRadius='8px'; el.style.marginBottom='6px';
+    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div style="width:48px;height:48px;background:#f3f4f6;border-radius:6px"></div><div><strong>${t.name||('Template '+(i+1))}</strong><div class="small">${t.type} · ${t.size}px</div></div></div><div style="display:flex;flex-direction:column;gap:6px"><button data-load="${i}">Load</button><button data-del="${i}" style="border-color:var(--danger);color:var(--danger)">Del</button></div>`;
+    templateList.appendChild(el);
+  });
+}
+loadTemplates();
+
+templateList.addEventListener('click', e=>{
+  const li = e.target.getAttribute('data-load'); const di = e.target.getAttribute('data-del');
+  const raw = localStorage.getItem(TEMPLATES_KEY); if(!raw) return; const arr = JSON.parse(raw);
+  if(li !== null){ const t = arr[parseInt(li)]; if(!t) return; const tab = document.querySelector(`.tab[data-type="${t.type}"]`); if(tab) tab.click(); if(t.type==='text'){ textContent.value = t.text||''; textFont.value = t.font||'Inter'; textFontSize.value = t.fontSize||28; textColor.value = t.textColor||'#111'; textBgColor.value = t.bgColor||'#fff'; document.querySelectorAll('#textShapePicker .shape-btn').forEach(b=>b.classList.remove('active')); const shp = document.querySelector(`#textShapePicker .shape-btn[data-shape="${t.shape||'none'}"]`); if(shp) shp.classList.add('active'); } else if(t.type==='url'){ urlContent.value = t.url||''; } fgColor.value = t.fg||'#000'; bgColor.value = t.bg||'#fff'; qrSize.value = t.size||360; qrSizeLabel.textContent = (t.size||360)+' px'; errLevel.value = t.err||'M'; if(livePreview.checked) debouncedGenerate(); }
+  else if(di !== null){ if(!confirm('Delete template?')) return; arr.splice(parseInt(di),1); localStorage.setItem(TEMPLATES_KEY, JSON.stringify(arr)); loadTemplates(); }
+});
+
+$('saveTemplate').addEventListener('click', ()=>{
+  const activeType = document.querySelector('.tab.active').dataset.type;
+  const arr = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]');
+  const obj = { type: activeType, fg: fgColor.value, bg: bgColor.value, size: parseInt(qrSize.value), err: errLevel.value, name: prompt('Template name (optional)') || (activeType+' template') };
+  if(activeType==='text'){ obj.text = textContent.value; obj.font = textFont.value; obj.fontSize = parseInt(textFontSize.value); obj.textColor = textColor.value; obj.bgColor = textBgColor.value; obj.shape = document.querySelector('#textShapePicker .shape-btn.active').dataset.shape; } else if(activeType==='url'){ obj.url = urlContent.value; }
+  arr.push(obj); localStorage.setItem(TEMPLATES_KEY, JSON.stringify(arr)); loadTemplates();
+});
+
+clearTemplates.addEventListener('click', ()=>{ if(confirm('Clear all templates?')){ localStorage.removeItem(TEMPLATES_KEY); loadTemplates(); } });
+
+/* History */
+function loadHistory(){ historyList.innerHTML=''; const raw = localStorage.getItem(HISTORY_KEY); if(!raw) return; const arr = JSON.parse(raw).reverse(); arr.forEach(item=>{ const el = document.createElement('div'); el.style.display='flex'; el.style.alignItems='center'; el.style.justifyContent='space-between'; el.style.padding='6px'; el.style.border='1px solid #eee'; el.style.borderRadius='8px'; el.style.marginBottom='6px'; el.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><img src="${item.dataURL}" style="width:48px;height:48px;border-radius:6px;background:#f3f4f6"><div><strong>${(item.text||'QR').slice(0,40)}</strong><div class="small">${new Date(item.created).toLocaleString()}</div></div></div><div style="display:flex;flex-direction:column;gap:6px"><button data-dl="${item.id}">DL</button><button data-del="${item.id}" style="border-color:var(--danger);color:var(--danger)">Del</button></div>`; historyList.appendChild(el); }); }
+loadHistory();
+
+historyList.addEventListener('click', e=>{
+  const dl = e.target.getAttribute('data-dl'); const del = e.target.getAttribute('data-del');
+  const raw = localStorage.getItem(HISTORY_KEY); if(!raw) return; let arr = JSON.parse(raw);
+  if(dl){ const it = arr.find(x=>x.id===dl); if(it){ const a = document.createElement('a'); a.href = it.dataURL; a.download = it.filename || 'qr.png'; a.click(); } }
+  else if(del){ if(!confirm('Delete this history item?')) return; arr = arr.filter(x=>x.id!==del); localStorage.setItem(HISTORY_KEY, JSON.stringify(arr)); loadHistory(); }
+});
+
+exportHistory.addEventListener('click', async ()=>{
+  try{
+    const arr = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); if(!arr.length){ alert('History empty'); return; }
+    if(typeof JSZip === 'undefined'){ alert('JSZip missing. Paste JSZip into the library placeholder to enable export.'); return; }
+    const zip = new JSZip();
+    for(let i=0;i<arr.length;i++){ const blob = await (await fetch(arr[i].dataURL)).blob(); zip.file(arr[i].filename||`qr_${i+1}.png`, blob); }
+    const content = await zip.generateAsync({type:'blob'}); const url = URL.createObjectURL(content); const a = document.createElement('a'); a.href = url; a.download = 'qr_history.zip'; a.click(); URL.revokeObjectURL(url);
+  }catch(err){ console.error(err); alert('Export failed: '+err.message); }
+});
+
+clearHistory.addEventListener('click', ()=>{ if(confirm('Clear history?')){ localStorage.removeItem(HISTORY_KEY); loadHistory(); } });
+
+/* Build payload */
+function getActiveType(){ return document.querySelector('.tab.active').dataset.type; }
+function buildPayload(){
+  const t = getActiveType();
+  switch(t){
+    case 'text': return textContent.value || '';
+    case 'url': return urlContent.value.trim();
+    case 'email': {
+      const to = emailTo.value.trim(); let s = `mailto:${to}`; const params = []; if(emailSubject.value.trim()) params.push('subject='+encodeURIComponent(emailSubject.value.trim())); if(emailBody.value.trim()) params.push('body='+encodeURIComponent(emailBody.value.trim())); if(params.length) s += '?'+params.join('&'); return s;
+    }
+    case 'phone': return 'tel:'+phoneNumber.value.trim();
+    case 'sms': { const num = smsNumber.value.trim(), msg = smsMessage.value.trim(); return `sms:${num}${msg ? '?body='+encodeURIComponent(msg):''}`; }
+    case 'wifi': { const ss = wifiSSID.value, pw = wifiPass.value, sec = wifiSec.value; return `WIFI:T:${sec};S:${ss};P:${pw};;`; }
+    case 'vcard': {
+      const parts = []; if(vcName.value) parts.push('FN:'+vcName.value); if(vcOrg.value) parts.push('ORG:'+vcOrg.value); if(vcTel.value) parts.push('TEL:'+vcTel.value); if(vcEmail.value) parts.push('EMAIL:'+vcEmail.value); if(vcUrl.value) parts.push('URL:'+vcUrl.value);
+      return 'BEGIN:VCARD\nVERSION:3.0\n' + parts.join('\n') + '\nEND:VCARD';
+    }
+    case 'event': {
+      const title = evTitle.value || 'Event'; const start = evStart.value.replace(' ','T')||''; const end = evEnd.value.replace(' ','T')||''; let s='BEGIN:VEVENT\nSUMMARY:'+title+'\n'; if(start) s+=`DTSTART:${start}\n`; if(end) s+=`DTEND:${end}\n`; if(evLoc.value) s+=`LOCATION:${evLoc.value}\n`; if(evDesc.value) s+=`DESCRIPTION:${evDesc.value}\n`; s+='END:VEVENT'; return s;
+    }
+    default: return '';
+  }
+}
+
+/* Build styled text page HTML */
+function escapeHtml(s){ return (s+'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function buildTextPageHtml(){
+  const txt = textContent.value || '';
+  const font = textFont.value || 'Inter';
+  const size = parseInt(textFontSize.value) || 28;
+  const color = textColor.value || '#111';
+  const bg = textBgColor.value || '#fff';
+  const shape = document.querySelector('#textShapePicker .shape-btn.active').dataset.shape || 'none';
+  let logoHtml = '';
+  // attempt to include local logo if the global uploader exists and currentPreviewCanvas has logo (best-effort)
+  if(window.currentLogoImage && window.currentLogoImage instanceof HTMLImageElement){
+    try{
+      const cv = document.createElement('canvas'); const ctx = cv.getContext('2d');
+      const max = 256; const w = Math.min(window.currentLogoImage.width, max), h = Math.min(window.currentLogoImage.height, max); cv.width=w; cv.height=h; ctx.drawImage(window.currentLogoImage,0,0,w,h); const data = cv.toDataURL('image/png'); logoHtml = `<img src="${data}" style="max-width:160px;display:block;margin:0 auto 12px;border-radius:8px">`;
+    }catch(e){ logoHtml=''; }
+  }
+  let shapeCss = '';
+  if(shape==='rectangle') shapeCss=`padding:18px;border-radius:0;`;
+  else if(shape==='rounded') shapeCss=`padding:18px;border-radius:18px;`;
+  else if(shape==='circle') shapeCss=`padding:28px;border-radius:999px;display:inline-block;`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Text</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:${bg};font-family:${font},system-ui,Arial,Helvetica,sans-serif} .wrap{max-width:900px;padding:24px;text-align:center} h1{color:${color};font-size:${size}px;margin:0;line-height:1.1} .box{${shapeCss}display:inline-block;background:transparent}</style></head><body><div class="wrap">${logoHtml}<div class="box"><h1>${escapeHtml(txt).replace(/\n/g,'<br>')}</h1></div></div></body></html>`;
+  return html;
+}
+
+/* estimate size for data URL (rough) */
+function estimateDataUrlSize(str){ return Math.ceil((str.length * 3)/2); }
+
+/* generate handler */
+async function generateHandler(opts={silent:false}){
+  // check for required QR lib
+  if(typeof QRCode === 'undefined'){ alert('QRCode library not found. Paste qrcode.min.js into the library placeholder in the HTML to enable generation.'); return; }
+  const type = getActiveType();
+  let payload = buildPayload();
+  if(!payload){ if(!opts.silent) alert('Enter content for the selected type'); return; }
+
+  // handle text page option
+  if(type==='text' && textAsPage.checked){
+    const pageHtml = buildTextPageHtml();
+    if(pageHtml.length > 1400){
+      if(!confirm('Styled page is large ('+Math.round(pageHtml.length/1000)+'KB) and may exceed QR capacity or scanner support. Proceed to encode data URL? Cancel will encode plain text instead.')){ payload = textContent.value; }
+      else { const b64 = btoa(unescape(encodeURIComponent(pageHtml))); payload = 'data:text/html;base64,' + b64; }
+    } else { const b64 = btoa(unescape(encodeURIComponent(pageHtml))); payload = 'data:text/html;base64,' + b64; }
+  }
+
+  // prepare preview area
+  previewArea.innerHTML = '';
+  const holder = document.createElement('div'); holder.style.width = qrSize.value+'px'; holder.style.height = qrSize.value+'px'; previewArea.appendChild(holder);
+
+  try{
+    // error correction map
+    const map = {L: QRCode.CorrectLevel.L, M: QRCode.CorrectLevel.M, Q: QRCode.CorrectLevel.Q, H: QRCode.CorrectLevel.H};
+    const options = { text: payload, width: parseInt(qrSize.value), height: parseInt(qrSize.value), colorDark: fgColor.value, colorLight: bgColor.value, correctLevel: map[errLevel.value] || QRCode.CorrectLevel.M };
+    const q = new QRCode(holder, options);
+    await new Promise(r=>setTimeout(r,250));
+    const canvas = holder.querySelector('canvas');
+    if(!canvas) throw new Error('Canvas not generated');
+    // overlay url logo if applicable
+    if(getActiveType()==='url' && currentURLLogoImage){
+      const ctx = canvas.getContext('2d');
+      const logoMax = canvas.width * 0.22; let lw=currentURLLogoImage.width, lh=currentURLLogoImage.height; const ratio = Math.min(logoMax/lw, logoMax/lh,1); lw*=ratio; lh*=ratio; let x=(canvas.width-lw)/2, y=(canvas.height-lh)/2; const pos = urlLogoPosition.value || 'center'; if(pos==='top') y=18; if(pos==='bottom') y=canvas.height-lh-18; ctx.fillStyle = bgColor.value; roundRect(ctx,x-6,y-6,lw+12,lh+12,8); ctx.fill(); ctx.drawImage(currentURLLogoImage, x, y, lw, lh);
+    }
+    currentPreviewCanvas = canvas; lastGeneratedText = payload;
+    downloadPNG.disabled = false; downloadSVG.disabled = false; downloadPDF.disabled = false; saveHistoryBtn.disabled = false;
+  }catch(err){
+    console.error(err); alert('Failed to generate QR: '+err.message); clearPreview();
+  }
+}
+
+/* helpers */
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+/* generate button */
+generateBtn.addEventListener('click', ()=> generateHandler({silent:false}));
+
+/* live preview */
+livePreview.addEventListener('change', ()=> { if(livePreview.checked) debouncedGenerate(); });
+
+/* download handlers */
+downloadPNG.addEventListener('click', ()=> {
+  if(!currentPreviewCanvas) return alert('Generate a QR first');
+  const url = currentPreviewCanvas.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = 'qrcode.png'; a.click();
+});
+
+downloadSVG.addEventListener('click', ()=> {
+  if(typeof qrcode === 'undefined'){ alert('SVG library missing (qrcode-generator). Paste it into the library placeholder.'); return; }
+  const payload = lastGeneratedText || buildPayload(); if(!payload) return alert('Generate a QR first');
+  const qrSvg = qrcode(0, errLevel.value || 'M'); qrSvg.addData(payload); qrSvg.make();
+  const svgString = qrSvg.createSvgTag({scalable:true, margin:2});
+  const blob = new Blob([svgString], {type:'image/svg+xml'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'qrcode.svg'; a.click(); URL.revokeObjectURL(url);
+});
+
+downloadPDF.addEventListener('click', async ()=>{
+  if(!currentPreviewCanvas) return alert('Generate a QR first');
+  if(typeof window.jspdf === 'undefined' && typeof window.jspdf === 'undefined' && typeof window.jspdf === 'object' && typeof window.jspdf.jsPDF === 'undefined'){ /* some builds expose jspdf differently; we'll check below */ }
+  if(typeof window.jspdf === 'undefined' && typeof window.jspdf === 'undefined'){ /* fallback */ }
+  if(typeof window.jspdf === 'undefined' && typeof window.jspdf === 'undefined'){ /* continue; user must paste jsPDF library */ }
+  if(typeof window.jspdf === 'undefined' && (typeof window.jspdf === 'undefined')) {
+    // try common bundling exposure
+    if(typeof window.jspdf === 'undefined' && typeof window.jspdf === 'object' && typeof window.jspdf.jsPDF === 'function'){
+      // ok
+    } else {
+      // try window.jspdf (umd) - many builds put jsPDF at window.jspdf.jsPDF
+      if(typeof window.jspdf === 'undefined' && typeof window.jspdf === 'undefined'){
+        // can't proceed
+      }
+    }
+  }
+  try{
+    // prefer window.jspdf.jsPDF
+    let jsPDF = null;
+    if(window.jspdf && window.jspdf.jsPDF) jsPDF = window.jspdf.jsPDF;
+    else if(window.jspdf && typeof window.jspdf === 'function') jsPDF = window.jspdf;
+    else if(window.jsPDF) jsPDF = window.jsPDF;
+    if(!jsPDF){ alert('jsPDF library missing. Paste jspdf.umd.min.js into the library placeholder to enable PDF export.'); return; }
+    const img = currentPreviewCanvas.toDataURL('image/png');
+    const pdf = new jsPDF({orientation:'portrait', unit:'pt', format:[currentPreviewCanvas.width+40, currentPreviewCanvas.height+40]});
+    pdf.addImage(img, 'PNG', 20, 20, currentPreviewCanvas.width, currentPreviewCanvas.height);
+    pdf.save('qrcode.pdf');
+  }catch(err){ console.error(err); alert('PDF export failed: '+err.message); }
+});
+
+/* save to history */
+$('saveHistory').addEventListener('click', ()=>{
+  if(!currentPreviewCanvas) return alert('Generate QR first');
+  const dataURL = currentPreviewCanvas.toDataURL('image/png'); const id = 'h_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  const rec = { id, text: (getActiveType()==='text' ? textContent.value : buildPayload()), dataURL, created: Date.now(), filename: 'qr_'+id+'.png' };
+  const arr = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); arr.push(rec); localStorage.setItem(HISTORY_KEY, JSON.stringify(arr)); loadHistory(); alert('Saved to history');
+});
+
+/* bulk excel */
+bulkGenerate.addEventListener('click', async ()=>{
+  const file = bulkFile.files[0]; if(!file) return alert('Choose an Excel file (.xlsx/.xls) with texts in column A');
+  if(typeof XLSX === 'undefined'){ alert('SheetJS (xlsx) missing. Paste xlsx.full.min.js into the library placeholder.'); return; }
+  if(typeof JSZip === 'undefined'){ alert('JSZip missing. Paste jszip.min.js into the library placeholder.'); return; }
+  bulkGenerate.disabled = true; bulkSpinner.style.display = 'inline-block';
+  try{
+    const buf = await file.arrayBuffer(); const wb = XLSX.read(buf, {type:'array'}); const sheet = wb.Sheets[wb.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+    const texts = rows.map(r => (r && r[0])? String(r[0]).trim() : '').filter(Boolean); if(!texts.length) { alert('No texts found in column A'); return; }
+    const zip = new JSZip();
+    for(let i=0;i<texts.length;i++){
+      const t = texts[i];
+      const off = document.createElement('div'); off.style.width=qrSize.value+'px'; off.style.height=qrSize.value+'px'; off.style.position='fixed'; off.style.left='-2000px'; off.style.top='-2000px'; document.body.appendChild(off);
+      await new Promise(r=>{
+        new QRCode(off, { text: t, width: parseInt(qrSize.value), height: parseInt(qrSize.value), colorDark: fgColor.value, colorLight: bgColor.value, correctLevel: QRCode.CorrectLevel.H });
+        setTimeout(r, 220);
+      });
+      const canvas = off.querySelector('canvas'); if(!canvas){ document.body.removeChild(off); continue; }
+      const blob = await new Promise(res=>canvas.toBlob(res,'image/png')); zip.file(`qr_${i+1}.png`, blob); document.body.removeChild(off);
+    }
+    const content = await zip.generateAsync({type:'blob'}); const url = URL.createObjectURL(content); const a = document.createElement('a'); a.href = url; a.download = 'qr_bulk.zip'; a.click(); URL.revokeObjectURL(url); alert('Generated '+texts.length+' PNGs in qr_bulk.zip');
+  }catch(err){ console.error(err); alert('Bulk failed: '+err.message); }
+  finally{ bulkGenerate.disabled=false; bulkSpinner.style.display='none'; }
+});
+
+/* helpers on load */
+(function init(){ loadTemplates(); loadHistory(); })();
+
+</script>
+
+</body>
+</html>
